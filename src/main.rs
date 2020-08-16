@@ -5,15 +5,41 @@ use grep::searcher::sinks::UTF8;
 use grep::searcher::{BinaryDetection, SearcherBuilder};
 
 use std::path::Path;
+use std::io::Write;
 
 use ignore::Walk;
 
+use termcolor::{StandardStream, ColorChoice};
+
+use clap::{App, Arg};
+
 fn main() {
+    let args = App::new("todo")
+        .version("0.1.0")
+        .author("ZigTag <GitHub>")
+        .about("Reads out your current TODOs")
+        .arg(Arg::with_name("path")
+            .short("d")
+            .long("path")
+            .value_name("DIR")
+            .help("Sets the working directory. (optional)")
+            .takes_value(true)
+            .required(false)
+            .default_value("./")
+            .index(1))
+        .arg(Arg::with_name("color")
+            .long("color")
+            .value_name("bool")
+            .help("Display text color.")
+            .default_value("true"))
+        .get_matches();
+
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
     let matcher = RegexMatcher::new(r".*TODO:.*").unwrap();
     let mut searcher = SearcherBuilder::new()
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .build();
-    let path = Path::new("./");
+    let path = Path::new(args.value_of("path").unwrap());
     let mut matches: Vec<(u64, String, String)> = vec![];
 
     for path in path {
@@ -28,7 +54,7 @@ fn main() {
             if !dent.path().is_file() {
                 continue;
             }
-            println!("dir '{}'", dent.path().display());
+            writeln!(&mut stdout, "dir '{}'", dent.path().display()).unwrap();
             let result = searcher.search_path(
                 &matcher,
                 dent.path(),
@@ -49,6 +75,6 @@ fn main() {
     }
 
     for (line, text, path) in matches {
-        println!("\nFile: '{}'\nLine: {}\nText: '{}'", path, line, text);
+        writeln!(&mut stdout, "\nFile: '{}'\nLine: {}\nText: '{}'", path, line, text).unwrap();
     }
 }
