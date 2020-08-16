@@ -8,5 +8,4 @@ edition = "2018"
 
 [dependencies]
 grep = "0.2"
-walkdir = "2"
-git2 = "0.13"
+ignore = "0.4"
