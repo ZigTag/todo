@@ -1,13 +1,16 @@
-use grep::regex::RegexMatcher;
-use grep::searcher::{SearcherBuilder, BinaryDetection};
-use std::path::Path;
-use grep::searcher::sinks::UTF8;
 use grep::matcher::Matcher;
+use grep::regex::RegexMatcher;
+use grep::searcher::sinks::UTF8;
+use grep::searcher::{BinaryDetection, SearcherBuilder};
+
+use std::path::Path;
+
 use walkdir::WalkDir;
+
 use git2::Repository;
 
 fn main() {
-    let matcher = RegexMatcher::new(r"TODO:").unwrap();
+    let matcher = RegexMatcher::new(r".*TODO:.*").unwrap();
     let mut searcher = SearcherBuilder::new()
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .build();
@@ -26,8 +29,11 @@ fn main() {
             _is_git = true;
 
             for path in path {
+                //TODO: Gitignore is not working properly
+
                 for result in WalkDir::new(path).into_iter().filter(|e| {
-                    !git.status_should_ignore(e.as_ref().unwrap().path()).unwrap()
+                    git.status_should_ignore(e.as_ref().unwrap().path())
+                        .unwrap()
                 }) {
                     let dent = match result {
                         Ok(dent) => dent,
@@ -45,19 +51,19 @@ fn main() {
                         dent.path(),
                         UTF8(|line_num, string| {
                             let my_match = matcher.find(string.as_bytes())?.unwrap();
-                            matches.push((line_num, string[my_match].to_string()));
+                            matches.push((line_num, string[my_match].trim().to_string()));
                             Ok(true)
-                        })
+                        }),
                     );
                     if let Err(err) = result {
                         eprintln!("{}: {}", dent.path().display(), err);
                     }
                 }
             }
-        },
+        }
         None => {
             _is_git = false;
-        },
+        }
     }
 
     println!("{:?}", matches);
