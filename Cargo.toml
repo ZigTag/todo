@@ -1,0 +1,12 @@
+[package]
+name = "todo"
+version = "0.1.0"
+authors = ["ZigTag <17077422+ZigTag@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+grep = "0.2"
+walkdir = "2"
+git2 = "0.13"
