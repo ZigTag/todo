@@ -7,7 +7,7 @@ use grep::searcher::{BinaryDetection, SearcherBuilder};
 use std::path::Path;
 use std::io::Write;
 
-use ignore::Walk;
+use ignore::WalkBuilder;
 
 use termcolor::{StandardStream, ColorChoice};
 
@@ -32,6 +32,10 @@ fn main() {
             .value_name("bool")
             .help("Display text color.")
             .default_value("true"))
+        .arg(Arg::with_name("show_hidden")
+            .short("h")
+            .long("show-hidden")
+            .help("Includes hidden files."))
         .get_matches();
 
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
@@ -41,9 +45,10 @@ fn main() {
         .build();
     let path = Path::new(args.value_of("path").unwrap());
     let mut matches: Vec<(u64, String, String)> = vec![];
+    let show_hidden = !args.is_present("show_hidden");
 
     for path in path {
-        for result in Walk::new(path) {
+        for result in WalkBuilder::new(path).hidden(show_hidden).build() {
             let dent = match result {
                 Ok(dent) => dent,
                 Err(err) => {
