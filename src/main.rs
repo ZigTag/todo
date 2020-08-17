@@ -14,6 +14,7 @@ use termcolor::{ColorChoice, StandardStream};
 use clap::{App, Arg};
 
 use git2::Repository;
+use time::OffsetDateTime;
 
 fn main() {
     let args = App::new("todo")
@@ -104,9 +105,11 @@ fn main() {
 
             let hunk = blame.get_line(line as usize).unwrap();
 
-            let commit = hunk.final_commit_id();
+            let commit = git.find_commit(hunk.final_commit_id()).unwrap();
 
-            writeln!(&mut stdout, "commit {}", commit).unwrap();
+            let time = OffsetDateTime::from_unix_timestamp(commit.time().seconds());
+
+            writeln!(&mut stdout, "{}-{} {}", time.year(), time.month_day().0, time.time()).unwrap();
         }
     } else {
         is_git = false;
