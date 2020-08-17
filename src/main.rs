@@ -4,12 +4,12 @@ use grep::regex::RegexMatcher;
 use grep::searcher::sinks::UTF8;
 use grep::searcher::{BinaryDetection, SearcherBuilder};
 
-use std::path::Path;
 use std::io::{self, Write};
+use std::path::Path;
 
 use ignore::WalkBuilder;
 
-use termcolor::{ColorChoice, StandardStream, WriteColor, ColorSpec, Color};
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use clap::{App, Arg};
 
@@ -46,6 +46,11 @@ fn main() {
                 .long("show-hidden")
                 .help("Includes hidden files."),
         )
+        .arg(
+            Arg::with_name("disable_git")
+                .long("disable-git")
+                .help("Disables git integration"),
+        )
         .get_matches();
 
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
@@ -57,12 +62,16 @@ fn main() {
     let mut matches: Vec<(usize, String, String)> = vec![];
     let show_hidden = !args.is_present("show_hidden");
 
-    let _is_git: bool;
+    let disable_git = args.is_present("disable_git");
 
-    let git = match Repository::open(path) {
+    let mut git = match Repository::open(path) {
         Ok(git) => Some(git),
         Err(_) => None,
     };
+
+    if disable_git {
+        git = None;
+    }
 
     for path in path {
         for result in WalkBuilder::new(path).hidden(show_hidden).build() {
@@ -95,18 +104,25 @@ fn main() {
         }
     }
 
-    let mut input = String::new();
-    writeln!(&mut stdout, "You have {} TODOs.\nWould you like to view them? (y/N)", matches.len()).unwrap();
-    io::stdin().read_line(&mut input).unwrap();
-    let input = input.trim().to_lowercase();
+    if matches.len() == 0 {
+        writeln!(&mut stdout, "You have 0 TODOs.").unwrap();
+    } else {
+        let mut input = String::new();
+        writeln!(
+            &mut stdout,
+            "You have {} TODOs.\nWould you like to view them? (y/N)",
+            matches.len()
+        )
+        .unwrap();
+        io::stdin().read_line(&mut input).unwrap();
+        let input = input.trim().to_lowercase();
 
-    if !("yes".starts_with(&input)) {
-        std::process::exit(0);
+        if !("yes".starts_with(&input)) {
+            std::process::exit(0);
+        }
     }
 
     if let Some(git) = git {
-        _is_git = true;
-
         for (line, text, path) in matches {
             let blame = git
                 .blame_file(Path::new(&path).strip_prefix("./").unwrap(), None)
@@ -118,7 +134,9 @@ fn main() {
 
             let time = OffsetDateTime::from_unix_timestamp(commit.time().seconds());
 
-            stdout.set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 131, 65)))).unwrap();
+            stdout
+                .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 131, 65))))
+                .unwrap();
             writeln!(&mut stdout, "{}", text).unwrap();
 
             stdout.reset().unwrap();
@@ -150,6 +168,25 @@ fn main() {
             stdout.reset().unwrap();
         }
     } else {
-        _is_git = false;
+        for (line, text, path) in matches {
+            stdout
+                .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 131, 65))))
+                .unwrap();
+            writeln!(&mut stdout, "{}", text).unwrap();
+
+            stdout.reset().unwrap();
+            write!(&mut stdout, "In file ").unwrap();
+
+            stdout.set_color(ColorSpec::new().set_bold(true)).unwrap();
+            write!(&mut stdout, "{}", path).unwrap();
+
+            stdout.reset().unwrap();
+            write!(&mut stdout, " at line ").unwrap();
+
+            stdout.set_color(ColorSpec::new().set_bold(true)).unwrap();
+            writeln!(&mut stdout, "{}\n", line).unwrap();
+
+            stdout.reset().unwrap();
+        }
     }
 }
