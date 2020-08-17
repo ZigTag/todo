@@ -4,16 +4,17 @@ use grep::regex::RegexMatcher;
 use grep::searcher::sinks::UTF8;
 use grep::searcher::{BinaryDetection, SearcherBuilder};
 
-use std::io::Write;
 use std::path::Path;
+use std::io::{self, Write};
 
 use ignore::WalkBuilder;
 
-use termcolor::{ColorChoice, StandardStream};
+use termcolor::{ColorChoice, StandardStream, WriteColor, ColorSpec, Color};
 
 use clap::{App, Arg};
 
 use git2::Repository;
+
 use time::OffsetDateTime;
 
 fn main() {
@@ -56,7 +57,7 @@ fn main() {
     let mut matches: Vec<(usize, String, String)> = vec![];
     let show_hidden = !args.is_present("show_hidden");
 
-    let is_git: bool;
+    let _is_git: bool;
 
     let git = match Repository::open(path) {
         Ok(git) => Some(git),
@@ -75,7 +76,6 @@ fn main() {
             if !dent.path().is_file() {
                 continue;
             }
-            writeln!(&mut stdout, "dir '{}'", dent.path().display()).unwrap();
             let result = searcher.search_path(
                 &matcher,
                 dent.path(),
@@ -95,8 +95,17 @@ fn main() {
         }
     }
 
+    let mut input = String::new();
+    writeln!(&mut stdout, "You have {} TODOs.\nWould you like to view them? (y/N)", matches.len()).unwrap();
+    io::stdin().read_line(&mut input).unwrap();
+    let input = input.trim().to_lowercase();
+
+    if !("yes".starts_with(&input)) {
+        std::process::exit(0);
+    }
+
     if let Some(git) = git {
-        is_git = true;
+        _is_git = true;
 
         for (line, text, path) in matches {
             let blame = git
@@ -109,17 +118,38 @@ fn main() {
 
             let time = OffsetDateTime::from_unix_timestamp(commit.time().seconds());
 
+            stdout.set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 131, 65)))).unwrap();
+            writeln!(&mut stdout, "{}", text).unwrap();
+
+            stdout.reset().unwrap();
+            write!(&mut stdout, "In file ").unwrap();
+
+            stdout.set_color(ColorSpec::new().set_bold(true)).unwrap();
+            write!(&mut stdout, "{}", path).unwrap();
+
+            stdout.reset().unwrap();
+            write!(&mut stdout, " at line ").unwrap();
+
+            stdout.set_color(ColorSpec::new().set_bold(true)).unwrap();
+            write!(&mut stdout, "{}", line).unwrap();
+
+            stdout.reset().unwrap();
+            write!(&mut stdout, " and last updated at ").unwrap();
+
+            stdout.set_color(ColorSpec::new().set_bold(true)).unwrap();
             writeln!(
                 &mut stdout,
-                "{}-{}-{} {}",
+                "{}-{}-{} {} UTC\n",
                 time.year(),
                 time.month(),
                 time.day(),
                 time.time()
             )
             .unwrap();
+
+            stdout.reset().unwrap();
         }
     } else {
-        is_git = false;
+        _is_git = false;
     }
 }
