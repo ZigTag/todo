@@ -109,7 +109,15 @@ fn main() {
 
             let time = OffsetDateTime::from_unix_timestamp(commit.time().seconds());
 
-            writeln!(&mut stdout, "{}-{} {}", time.year(), time.month_day().0, time.time()).unwrap();
+            writeln!(
+                &mut stdout,
+                "{}-{}-{} {}",
+                time.year(),
+                time.month(),
+                time.day(),
+                time.time()
+            )
+            .unwrap();
         }
     } else {
         is_git = false;
