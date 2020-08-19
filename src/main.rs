@@ -114,7 +114,7 @@ fn main() {
 
     if let Some(git) = git {
         thread::spawn(move || {
-            let mut results: Vec<(usize, String, String, OffsetDateTime)> = vec![];
+            let mut results: Vec<(usize, String, String, Option<OffsetDateTime>)> = vec![];
 
             for (line, text, path) in matches_thread {
                 let blame = git
@@ -127,16 +127,26 @@ fn main() {
 
                 let time = OffsetDateTime::from_unix_timestamp(commit.time().seconds());
 
-                results.push((line, text, path, time))
+                results.push((line, text, path, Some(time)))
             }
             result_tx.send(results).unwrap();
         });
         is_git = true;
     } else {
+        thread::spawn(move || {
+            let mut results: Vec<(usize, String, String, Option<OffsetDateTime>)> = vec![];
+
+            for (line, text, path) in matches_thread {
+                results.push((line, text, path, None))
+            }
+            result_tx.send(results).unwrap()
+        });
+
         is_git = false;
     }
 
-    let results: Vec<(usize, String, String, OffsetDateTime)> = result_rx.recv().unwrap();
+
+    let results: Vec<(usize, String, String, Option<OffsetDateTime>)> = result_rx.recv().unwrap();
 
     if matches.len() == 0 {
         writeln!(&mut stdout, "You have 0 TODOs.").unwrap();
@@ -158,6 +168,8 @@ fn main() {
 
     if is_git == true {
         for (line, text, path, time) in results {
+            let time = time.unwrap();
+
             stdout
                 .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 131, 65))))
                 .unwrap();
@@ -192,7 +204,7 @@ fn main() {
             stdout.reset().unwrap();
         }
     } else {
-        for (line, text, path) in matches {
+        for (line, text, path, _) in results {
             stdout
                 .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 131, 65))))
                 .unwrap();
