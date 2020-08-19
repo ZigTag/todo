@@ -6,8 +6,8 @@ use grep::searcher::{BinaryDetection, SearcherBuilder};
 
 use std::io::{self, Write};
 use std::path::Path;
-use std::thread;
 use std::sync::mpsc;
+use std::thread;
 
 use ignore::WalkBuilder;
 
@@ -145,10 +145,9 @@ fn main() {
         is_git = false;
     }
 
-
     let results: Vec<(usize, String, String, Option<OffsetDateTime>)> = result_rx.recv().unwrap();
 
-    if matches.len() == 0 {
+    if matches.is_empty() {
         writeln!(&mut stdout, "You have 0 TODOs.").unwrap();
     } else {
         let mut input = String::new();
@@ -157,7 +156,7 @@ fn main() {
             "You have {} TODOs.\nWould you like to view them? (y/N)",
             matches.len()
         )
-            .unwrap();
+        .unwrap();
         io::stdin().read_line(&mut input).unwrap();
         let input = input.trim().to_lowercase();
 
@@ -166,7 +165,7 @@ fn main() {
         }
     }
 
-    if is_git == true {
+    if is_git {
         for (line, text, path, time) in results {
             let time = time.unwrap();
 
@@ -199,7 +198,7 @@ fn main() {
                 time.day(),
                 time.time()
             )
-                .unwrap();
+            .unwrap();
 
             stdout.reset().unwrap();
         }
