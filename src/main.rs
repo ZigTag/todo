@@ -6,6 +6,8 @@ use grep::searcher::{BinaryDetection, SearcherBuilder};
 
 use std::io::{self, Write};
 use std::path::Path;
+use std::thread;
+use std::sync::mpsc;
 
 use ignore::WalkBuilder;
 
@@ -64,6 +66,10 @@ fn main() {
 
     let disable_git = args.is_present("disable_git");
 
+    let is_git: bool;
+
+    let (result_tx, result_rx) = mpsc::channel();
+
     let mut git = match Repository::open(path) {
         Ok(git) => Some(git),
         Err(_) => None,
@@ -104,6 +110,34 @@ fn main() {
         }
     }
 
+    let matches_thread = matches.clone();
+
+    if let Some(git) = git {
+        thread::spawn(move || {
+            let mut results: Vec<(usize, String, String, OffsetDateTime)> = vec![];
+
+            for (line, text, path) in matches_thread {
+                let blame = git
+                    .blame_file(Path::new(&path).strip_prefix("./").unwrap(), None)
+                    .unwrap();
+
+                let hunk = blame.get_line(line as usize).unwrap();
+
+                let commit = git.find_commit(hunk.final_commit_id()).unwrap();
+
+                let time = OffsetDateTime::from_unix_timestamp(commit.time().seconds());
+
+                results.push((line, text, path, time))
+            }
+            result_tx.send(results).unwrap();
+        });
+        is_git = true;
+    } else {
+        is_git = false;
+    }
+
+    let results: Vec<(usize, String, String, OffsetDateTime)> = result_rx.recv().unwrap();
+
     if matches.len() == 0 {
         writeln!(&mut stdout, "You have 0 TODOs.").unwrap();
     } else {
@@ -113,7 +147,7 @@ fn main() {
             "You have {} TODOs.\nWould you like to view them? (y/N)",
             matches.len()
         )
-        .unwrap();
+            .unwrap();
         io::stdin().read_line(&mut input).unwrap();
         let input = input.trim().to_lowercase();
 
@@ -122,18 +156,8 @@ fn main() {
         }
     }
 
-    if let Some(git) = git {
-        for (line, text, path) in matches {
-            let blame = git
-                .blame_file(Path::new(&path).strip_prefix("./").unwrap(), None)
-                .unwrap();
-
-            let hunk = blame.get_line(line as usize).unwrap();
-
-            let commit = git.find_commit(hunk.final_commit_id()).unwrap();
-
-            let time = OffsetDateTime::from_unix_timestamp(commit.time().seconds());
-
+    if is_git == true {
+        for (line, text, path, time) in results {
             stdout
                 .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 131, 65))))
                 .unwrap();
@@ -163,7 +187,7 @@ fn main() {
                 time.day(),
                 time.time()
             )
-            .unwrap();
+                .unwrap();
 
             stdout.reset().unwrap();
         }
